@@ -1,0 +1,103 @@
+﻿<hc:Window x:Class="AppUpdateManager.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:hc="https://handyorg.github.io/handycontrol"
+        xmlns:prism="http://prismlibrary.com/"
+        prism:ViewModelLocator.AutoWireViewModel="True"
+        mc:Ignorable="d"
+        Title="{Binding Title}" 
+        WindowStartupLocation="CenterScreen"
+        ShowTitle="True"
+        Height="450" 
+        Width="800">
+    <hc:Window.NonClientAreaContent>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+
+            <Button HorizontalAlignment="Right" Grid.Column="1" Click="ButtonConfig_OnClick" Name="ButtonConfig" Style="{StaticResource ButtonIcon}" Foreground="{DynamicResource PrimaryTextBrush}" hc:IconElement.Geometry="{StaticResource ConfigGeometry}"/>
+            <Popup AllowsTransparency="True" Grid.Column="1" PlacementTarget="{Binding ElementName=ButtonConfig}" HorizontalOffset="-35" Name="PopupConfig" VerticalOffset="6" StaysOpen="False">
+                <Border Background="{DynamicResource SecondaryRegionBrush}" CornerRadius="4" Margin="16" Effect="{StaticResource EffectShadow2}">
+                    <StackPanel Button.Click="ButtonSkins_OnClick">
+                        <hc:Divider Width="200" Margin="0,10" Content="Application Theme"/>
+                        <StackPanel HorizontalAlignment="Center" Orientation="Horizontal">
+                            <Button Tag="{x:Static hc:ApplicationTheme.Light}" Style="{StaticResource ButtonCustom}">
+                                <Border Background="White" Width="32" Height="21" CornerRadius="2" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"/>
+                            </Button>
+                            <Button Tag="{x:Static hc:ApplicationTheme.Dark}" Style="{StaticResource ButtonCustom}" Margin="10,0,0,0">
+                                <Border Background="Black" Width="32" Height="21" CornerRadius="2" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"/>
+                            </Button>
+                        </StackPanel>
+
+                        <hc:Divider Width="200" Margin="0,10" Content="Accent Color"/>
+                        <StackPanel Margin="0,0,0,10" HorizontalAlignment="Center" Orientation="Horizontal">
+                            <Button Tag="{Binding ElementName=primaryBorder, Path=Background}" Style="{StaticResource ButtonCustom}">
+                                <Border Name="primaryBorder" Background="#2196F3" Width="32" Height="21" CornerRadius="2" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"/>
+                            </Button>
+                            <Button Tag="{Binding ElementName=warningBorder, Path=Background}" Style="{StaticResource ButtonCustom}" Margin="10,0,0,0">
+                                <Border Name="warningBorder" Background="{DynamicResource WarningBrush}" Width="32" Height="21" CornerRadius="2" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"/>
+                            </Button>
+                            <Button Tag="{Binding ElementName=violetBorder, Path=Background}" Style="{StaticResource ButtonCustom}" Margin="10,0,0,0">
+                                <Border Name="violetBorder" Background="#9C27B0" Width="32" Height="21" CornerRadius="2" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"/>
+                            </Button>
+                            <Button Tag="{Binding ElementName=successBorder, Path=Background}" Style="{StaticResource ButtonCustom}" Margin="10,0,0,0">
+                                <Border Name="successBorder" Background="{DynamicResource SuccessBrush}" Width="32" Height="21" CornerRadius="2" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"/>
+                            </Button>
+                        </StackPanel>
+                        <Button HorizontalAlignment="Stretch" Tag="Picker" Content="More Colors" Margin="10"/>
+                    </StackPanel>
+                </Border>
+            </Popup>
+        </Grid>
+    </hc:Window.NonClientAreaContent>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="80"/>
+            <ColumnDefinition Width="200"/>
+        </Grid.ColumnDefinitions>
+        <DockPanel>
+            <hc:TextBox Margin="10,10,10,0" DockPanel.Dock="Top" hc:TitleElement.Title="版本號" IsReadOnly="True" Text="{Binding Version,Converter={StaticResource Int2StringConverter}}"/>
+            <hc:TextBox Margin="10,10,10,0" DockPanel.Dock="Top" hc:TitleElement.Title="更新路徑" Text="{Binding UpdatePath}"/>
+            <hc:TextBox Margin="10,10,10,0" DockPanel.Dock="Top" hc:TitleElement.Title="重啟應用程式名稱" Text="{Binding Restart}"/>
+            <hc:TextBox Margin="10,10,10,0" DockPanel.Dock="Top" hc:TitleElement.Title="更新清單" Text="{Binding UpdateList}"/>
+            <hc:TextBox Margin="10,10,10,10" DockPanel.Dock="Top" hc:TitleElement.Title="更新內容" Text="{Binding UpdateContent}" VerticalContentAlignment="Top"/>
+        </DockPanel>
+        <hc:SimpleStackPanel Grid.Column="1">
+            <Button Content="選擇" Margin="0,103,0,0" Command="{Binding ExecuteUpdatePath}"/>
+            <Button Content="選擇" Margin="0,103,0,0" Command="{Binding ExecuteUpdateList}"/>
+            <Button Content="開始" Margin="0,103,0,0" Command="{Binding ExecuteUpdate}"/>
+        </hc:SimpleStackPanel>
+
+        <hc:StepBar Dock="Right" Grid.Column="2" Margin="0,0,20,0" StepIndex="{Binding StepIndex}">
+            <StackPanel MaxHeight="50">
+                <TextBlock FontSize="16" FontWeight="Bold" HorizontalAlignment="Left">
+                        <Run Text="Step"/>
+                        <Run Text="1"/>
+                    <hc:LoadingCircle Height="25" Visibility="{Binding Step1Loading,Converter={StaticResource Boolean2VisibilityConverter}}"/>
+                </TextBlock>
+                <TextBlock Margin="0,4,0,0" Text="Move old file"/>
+            </StackPanel>
+            <StackPanel MaxHeight="50">
+                <TextBlock FontSize="16" FontWeight="Bold" HorizontalAlignment="Left">
+                        <Run Text="Step"/>
+                        <Run Text="2"/>
+                    <hc:LoadingCircle Height="25" Visibility="{Binding Step2Loading,Converter={StaticResource Boolean2VisibilityConverter}}"/>
+                </TextBlock>
+                <TextBlock Margin="0,4,0,0" Text="Create config"/>
+            </StackPanel>
+            <StackPanel MaxHeight="50">
+                <TextBlock FontSize="16" FontWeight="Bold" HorizontalAlignment="Left">
+                        <Run Text="Step"/>
+                        <Run Text="3"/>
+                    <hc:LoadingCircle Height="25" Visibility="{Binding Step3Loading,Converter={StaticResource Boolean2VisibilityConverter}}"/>
+                </TextBlock>
+                <TextBlock Margin="0,4,0,0" Text="Upload file"/>
+            </StackPanel>
+        </hc:StepBar>
+    </Grid>
+</hc:Window>
