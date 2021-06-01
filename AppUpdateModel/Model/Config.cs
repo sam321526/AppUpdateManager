@@ -4,14 +4,14 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AppUpdateManager.Model
+namespace AppUpdateModel.Model
 {
     public class Config
     {
         /// <summary>
         /// 更新版本
         /// </summary>
-        public int Version { set; get; }
+        public int Version { set; get; }        
         /// <summary>
         /// 更新清單
         /// </summary>

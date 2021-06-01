@@ -1,9 +1,11 @@
-﻿using Prism.Commands;
+﻿using HandyControl.Controls;
+using Prism.Commands;
 using Prism.Mvvm;
 using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace AppUpdateManager.ViewModels
 {
@@ -46,6 +48,12 @@ namespace AppUpdateManager.ViewModels
             get => _Version;
             set => SetProperty(ref _Version, value);
         }
+        private string _SourcePath = "";
+        public string SourcePath
+        {
+            get => _SourcePath;
+            set => SetProperty(ref _SourcePath, value);
+        }
         private string _UpdatePath = "";
         public string UpdatePath
         {
@@ -63,7 +71,12 @@ namespace AppUpdateManager.ViewModels
         public string UpdateList
         {
             get => _UpdateList;
-            set => SetProperty(ref _UpdateList, value);
+            set
+            {
+                if (string.IsNullOrEmpty(value))
+                    _UpdateListPath = "";
+                SetProperty(ref _UpdateList, value);
+            }
         }
         private string _UpdateContent = "";
         public string UpdateContent
@@ -79,27 +92,41 @@ namespace AppUpdateManager.ViewModels
             set => SetProperty(ref _canExecute, value);
             get => _canExecute;
         }
+        public DelegateCommand ExecuteSourcePath { get; private set; }
         public DelegateCommand ExecuteUpdatePath { get; private set; }
-        public DelegateCommand ExecuteUpdateList { get; private set; }
+        public DelegateCommand ExecuteUpdateListFolder { get; private set; }
+        public DelegateCommand ExecuteUpdateListFile { get; private set; }
         public DelegateCommand ExecuteUpdate { get; private set; }
         #endregion Command
         public MainWindowViewModel()
         {
             ExecuteUpdatePath = new DelegateCommand(SelectUpdatePath, () => CanExecute);
-            ExecuteUpdateList = new DelegateCommand(SelectUpdateList, () => CanExecute);
+            ExecuteUpdateListFolder = new DelegateCommand(SelectUpdateListFolder, () => CanExecute);
+            ExecuteUpdateListFile = new DelegateCommand(SelectUpdateListFile, () => CanExecute);
             ExecuteUpdate = new DelegateCommand(StartUpdate, () => CanExecute);
+            ExecuteSourcePath = new DelegateCommand(SelecteSourcePath, () => CanExecute);
+        }
+        private void SelecteSourcePath()
+        {
+            // 先選擇資料夾
+            var SourceFolder = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog();
+            if (SourceFolder.ShowDialog() == true)
+            {
+                SourcePath = SourceFolder.SelectedPath + @"\";
+            }
         }
         private void SelectUpdatePath()
-        {            
+        {
             var UpdateFolder = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog();
             if (UpdateFolder.ShowDialog() == true)
             {
                 UpdatePath = UpdateFolder.SelectedPath;
+                // 有設定檔就讀取近來
                 if (File.Exists($@"{UpdatePath}\UpdateConfig.json"))
                 {
                     using (StreamReader sr = new StreamReader($@"{UpdatePath}\UpdateConfig.json"))
                     {
-                        var config = Newtonsoft.Json.JsonConvert.DeserializeObject<Model.Config>(sr.ReadToEnd());
+                        var config = Newtonsoft.Json.JsonConvert.DeserializeObject<AppUpdateModel.Model.Config>(sr.ReadToEnd());
                         Version = config.Version;
                         UpdateContent = config.UpdateContent;
                         Restart = config.Restart;
@@ -115,85 +142,102 @@ namespace AppUpdateManager.ViewModels
                 }
             }
         }
-        private void SelectUpdateList()
-        {            
-            UpdateList = "";
-            _UpdateListPath = "";
-            // 先選擇資料夾
+        private void SelectUpdateListFolder()
+        {
             var UpdateFolder = new Ookii.Dialogs.Wpf.VistaFolderBrowserDialog();
-            UpdateFolder.SelectedPath = AppDomain.CurrentDomain.BaseDirectory;
+            UpdateFolder.SelectedPath = SourcePath;
+
             if (UpdateFolder.ShowDialog() == true)
             {
-                UpdateList = Path.GetFileName(UpdateFolder.SelectedPath) + ";";
-                _UpdateListPath = UpdateFolder.SelectedPath + ";";
+                string Folder = UpdateFolder.SelectedPath.Replace(SourcePath, "");
+                _UpdateListPath += $"{Folder};";
+                UpdateList += Path.GetFileName(Folder) + ";";
             }
-            // 再選擇檔案
+        }
+        private void SelectUpdateListFile()
+        {
+            // 選擇檔案
             var UpdateFile = new Ookii.Dialogs.Wpf.VistaOpenFileDialog();
             UpdateFile.Multiselect = true;
-
+            UpdateFile.InitialDirectory = UpdatePath;
             if (UpdateFile.ShowDialog() == true)
             {
                 string[] Files = UpdateFile.FileNames;
-                _UpdateListPath += string.Join(";", Files);
-
                 foreach (string file in Files)
                 {
+                    _UpdateListPath += $"{file.Replace(SourcePath, "")};";
                     UpdateList += Path.GetFileName(file) + ";";
                 }
             }
         }
         private void StartUpdate()
         {
-            // move old file to old folder
-            Step1Loading = true;
-            string oldFolder = $@"{UpdatePath}\old";
-            if (Directory.Exists(oldFolder)) Directory.Delete(oldFolder, true);
-            var Temps = Directory.EnumerateFileSystemEntries(UpdatePath, "*", SearchOption.AllDirectories).ToList();
-            Directory.CreateDirectory(oldFolder);
-            foreach (string temp in Temps)
+            Task.Factory.StartNew(() =>
             {
-                if (!temp.Equals(oldFolder))
-                    Directory.Move(temp, $@"{oldFolder}\{Path.GetFileName(temp)}");
-            }
-            Thread.Sleep(200);
-            Step1Loading = false;
+                // move old file to old folder
+                StepIndex = 0;
+                Step1Loading = true;
+                string oldFolder = $@"{UpdatePath}\old";
+                if (Directory.Exists(oldFolder)) Directory.Delete(oldFolder, true);
+                var Temps = Directory.EnumerateFileSystemEntries(UpdatePath, "*", SearchOption.AllDirectories).ToList();
+                Directory.CreateDirectory(oldFolder);
+                foreach (string temp in Temps)
+                {
+                    try
+                    {
+                        if (!temp.Equals(oldFolder))
+                            Directory.Move(temp, $@"{oldFolder}\{Path.GetFileName(temp)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
+                }
+                Thread.Sleep(500);
+                Step1Loading = false;
 
-            StepIndex = 1;
-            Step2Loading = true;
-            // create server config 
-            Model.Config serverConfig = new Model.Config();
-            serverConfig.Version = ++Version;
-            serverConfig.UpdatePath = UpdatePath;
-            serverConfig.UpdateList = _UpdateListPath;
-            serverConfig.UpdateContent = UpdateContent;
-            serverConfig.Restart = Restart;
-            serverConfig.UpdateTime = DateTime.Now;
-            using (StreamWriter sw = new StreamWriter($@"{UpdatePath}\UpdateConfig.json"))
-            {
-                sw.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(serverConfig));
-                sw.Flush();
-            }
-            Thread.Sleep(200);
-            Step2Loading = false;
+                StepIndex = 1;
+                Step2Loading = true;
+                // create server config 
+                AppUpdateModel.Model.Config serverConfig = new AppUpdateModel.Model.Config
+                {
+                    Version = ++Version,
+                    UpdatePath = UpdatePath + "\\",
+                    UpdateList = _UpdateListPath,
+                    UpdateContent = UpdateContent,
+                    Restart = Restart,
+                    UpdateTime = DateTime.Now
+                };
+                using (StreamWriter sw = new StreamWriter($@"{UpdatePath}\UpdateConfig.json"))
+                {
+                    sw.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(serverConfig));
+                    sw.Flush();
+                }
+                Thread.Sleep(500);
+                Step2Loading = false;
 
-            StepIndex = 2;
-            Step3Loading = true;
-            // upload file
-            CopyFolderAndFile(_UpdateListPath.Split(new string[] { ";" }, StringSplitOptions.RemoveEmptyEntries));
-            Step3Loading = false;
+                StepIndex = 2;
+                Step3Loading = true;
+                // upload file
+                CopyFolderAndFile(_UpdateListPath.Split(new string[] { ";" }, StringSplitOptions.RemoveEmptyEntries));
+                Step3Loading = false;
+                MessageBox.Show("上傳完成", "訊息", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+            });
         }
         private void CopyFolderAndFile(string[] Source)
         {
             foreach (string temp in Source)
             {
-                if (Directory.Exists(temp))
+                string fPath = temp;
+                if (temp.Contains(SourcePath)) fPath = temp.Replace(SourcePath, "");
+                if (Directory.Exists($@"{SourcePath}{fPath}"))
                 {
-                    Directory.CreateDirectory($@"{UpdatePath}\{temp.Replace($@"{AppDomain.CurrentDomain.BaseDirectory}", "")}");
-                    CopyFolderAndFile(Directory.EnumerateFileSystemEntries(temp, "*", SearchOption.AllDirectories).ToArray());
+                    Directory.CreateDirectory($@"{UpdatePath}\{fPath}");
+                    CopyFolderAndFile(Directory.EnumerateFileSystemEntries($@"{SourcePath}{fPath}", "*", SearchOption.AllDirectories).ToArray());
                 }
-                else if (File.Exists(temp))
+                else if (File.Exists($@"{SourcePath}{fPath}"))
                 {
-                    File.Copy(temp, $@"{UpdatePath}\{temp.Replace($@"{AppDomain.CurrentDomain.BaseDirectory}", "")}", overwrite: true);
+                    File.Copy($@"{SourcePath}{fPath}", $@"{UpdatePath}\{fPath}", overwrite: true);
                 }
             }
         }
